@@ -1,3 +1,3 @@
-raw_data/train*
-raw_data/test*
-raw_data/sampleSubmission*
+raw_data/*
+.DS_Store
+subsampled_data/*
