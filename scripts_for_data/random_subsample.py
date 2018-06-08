@@ -1,3 +1,19 @@
+"""
+This file is designed for sample the raw_data when the raw_data is too large.
+The sample method is random.
+
+@params
+path : raw_data's path
+sample_size : how many lines you want to sample
+has_header : whether the raw_data has header
+
+return:
+nothing; the output file is here: /Users/kaishen/git_storage/avazuCTR/subsampled_data/random_subsample100m
+
+
+"""
+
+
 import random
 random.seed(42)
 import 	sys
