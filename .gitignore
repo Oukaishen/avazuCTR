@@ -2,3 +2,5 @@ raw_data/*
 .DS_Store
 subsampled_data/*
 .idea/
+*csv*
+*.pkl
