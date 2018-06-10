@@ -48,7 +48,7 @@ reader_test = pd.read_table(test, sep=',', chunksize=chunk_size,header=0,names=h
 #serialize training
 model_file=MODEL_PATH+'model-avazu-sgd.pkl'
 cls = joblib.load(model_file)
-preproc_file=MODEL_PATH+'model-avazu-preproc.pkl'
+preproc_file=MODEL_PATH+'model-avazu-preproc-sgd.pkl'
 preproc = joblib.load(preproc_file)
 
 submission=SUBMISSION_PATH+'prediction-avazu.csv'
@@ -99,4 +99,4 @@ with open(submission, 'w+') as outfile:
      x=clean_data(data)
      p =cls.predict_proba(x)[:,1]
      dfjo = DataFrame(dict(ID=ID,click=p), columns=['ID','click'])
-     dfjo.to_csv(outfile,header=None,index_label=None,index=False)
+     dfjo.to_csv(outfile,header=False,index_label=False,index=False)

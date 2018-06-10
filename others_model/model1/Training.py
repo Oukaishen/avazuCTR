@@ -24,7 +24,7 @@ from datetime import datetime, date, time
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import log_loss
-from sklearn import  cross_validation
+from sklearn.model_selection import cross_val_score
 from sklearn.feature_extraction import FeatureHasher
 from sklearn import preprocessing 
 from sklearn.pipeline import Pipeline
@@ -33,6 +33,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.externals import joblib
 #json library for settings file
 import json
+
+# ignore warnings 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 ##Read configuration parameters
 file_dir = './Avazu-settings.json'
@@ -54,7 +58,7 @@ reader = pd.read_table(train_file, sep=',', chunksize=chunk_size, names=header,h
 all_classes = np.array([-1, 1])
 
 #classifier
-cls= SGDClassifier(loss='log', n_iter=200, alpha=.0000001, penalty='l2',\
+cls= SGDClassifier(loss='log', alpha=.0000001, penalty='l2', max_iter = 200,\
 learning_rate='invscaling',power_t=0.5,eta0=4.0,shuffle=True,n_jobs=-1,random_state=seed)
 
  
@@ -62,28 +66,28 @@ learning_rate='invscaling',power_t=0.5,eta0=4.0,shuffle=True,n_jobs=-1,random_st
 preproc =Pipeline([('fh',FeatureHasher( n_features=2**27,input_type='string', non_negative=False))])
 # 
 def clean_data(data):
-    y_train=data['click'].values +data['click'].values-1##for Vowpal Wabbit
-    data['app']=data['app_id'].values+data['app_domain'].values+data['app_category'].values
-    data['site']=data['site_id'].values+data['site_domain'].values+data['site_category'].values
-    data['device']= data['device_id'].values+data['device_ip'].values+data['device_model'].values+(data['device_type'].values.astype(str))+(data['device_conn_type'].values.astype(str))
-    data['type']=data['device_type'].values +data['device_conn_type'].values 
-    data['iden']=data['app_id'].values +data['site_id'].values +data['device_id'].values
-    data['domain']=data['app_domain'].values +data['site_domain'].values 
-    data['category']=data['app_category'].values+data['site_category'].values
-    data['pS1']=data['C1'].values.astype(str)+data['app_id']
-    data['pS2']= data['C14'].values+data['C15'].values+data['C16'].values+data['C17'].values
-    data['pS3']=data['C18'].values+data['C19'].values+data['C20'].values+data['C21'].values
-    data['sum']=data['C1'].values+data['C14'].values+data['C15'].values+data['C16'].values+data['C17'].values\
+    y_train=data['click'].values*2 - 1##for Vowpal Wabbit
+    data.loc[:,'app']=data['app_id'].values+data['app_domain'].values+data['app_category'].values
+    data.loc[:,'site']=data['site_id'].values+data['site_domain'].values+data['site_category'].values
+    data.loc[:,'device']= data['device_id'].values+data['device_ip'].values+data['device_model'].values+(data['device_type'].values.astype(str))+(data['device_conn_type'].values.astype(str))
+    data.loc[:,'type']=data['device_type'].values +data['device_conn_type'].values 
+    data.loc[:,'iden']=data['app_id'].values +data['site_id'].values +data['device_id'].values
+    data.loc[:,'domain']=data['app_domain'].values +data['site_domain'].values 
+    data.loc[:,'category']=data['app_category'].values+data['site_category'].values
+    data.loc[:,'pS1']=data['C1'].values.astype(str)+data['app_id']
+    data.loc[:,'pS2']= data['C14'].values+data['C15'].values+data['C16'].values+data['C17'].values
+    data.loc[:,'pS3']=data['C18'].values+data['C19'].values+data['C20'].values+data['C21'].values
+    data.loc[:,'sum']=data['C1'].values+data['C14'].values+data['C15'].values+data['C16'].values+data['C17'].values\
     +data['C18'].values+data['C19'].values+data['C20'].values+data['C21'].values
-    data['pos']= data['banner_pos'].values.astype(str)+data['app_category'].values+data['site_category'].values 
-    data['pS4']=data['C1'].values-data['C20'].values
-    data['ps5']=data['C14'].values-data['C21'].values 
+    data.loc[:,'pos']= data['banner_pos'].values.astype(str)+data['app_category'].values+data['site_category'].values 
+    data.loc[:,'pS4']=data['C1'].values-data['C20'].values
+    data.loc[:,'ps5']=data['C14'].values-data['C21'].values 
     
-    data['hour']=data['hour'].map(lambda x: datetime.strptime(str(x),"%y%m%d%H"))
-    data['dayoftheweek']=data['hour'].map(lambda x:  x.weekday())
-    data['day']=data['hour'].map(lambda x:  x.day)
-    data['hour']=data['hour'].map(lambda x:  x.hour)
-    day=data['day'].values[len(data)-1]
+    data.loc[:,'hour']=data['hour'].map(lambda x: datetime.strptime(str(x),"%y%m%d%H"))
+    data.loc[:,'dayoftheweek']=data['hour'].map(lambda x:  x.weekday())
+    data.loc[:,'day']=data['hour'].map(lambda x:  x.day)
+    data.loc[:,'hour']=data['hour'].map(lambda x:  x.hour)
+    day=data.loc[:,'day'].values[len(data)-1]
     clean=data.drop(['id','click'], axis=1)#remove id and click columns
     X_dict=np.asarray(clean.astype(str))
     y_train = np.asarray(y_train).ravel()
@@ -124,22 +128,26 @@ for data in reader:
     if i%10==0:
      print('iter:%s' %i)
      print(LogLoss)
-    if day!=temp:
-      print('day:%s' %day)
-      LogLoss1= cross_validation.cross_val_score(cls, X_train, y_train, scoring='log_loss')
-      print(LogLoss1)
-      print('elapsed time: %s, log_loss:%f' % (str(datetime.now() - start), LogLoss))
+    ##### my data is random no need to do this
+    # if day!=temp:
+    #   print('day:%s' %day)
+    #   LogLoss1= cross_val_score(cls, X_train, y_train, scoring='log_loss')
+    #   print(LogLoss1)
+    #   print('elapsed time: %s, log_loss:%f' % (str(datetime.now() - start), LogLoss))
     temp=day
 print()
 print ('Ended training')
 print('latest iter:%s' %i)
-LogLoss1= cross_validation.cross_val_score(cls, X_train, y_train, scoring='log_loss')
+LogLoss1= cross_val_score(cls, X_train, y_train, scoring='log_loss')
 print(LogLoss1)
 print('elapsed time: %s, log_loss:%f' % (str(datetime.now() - start), LogLoss))
+
+###################################################################################
 
 #serialize training
 model_file=MODEL_PATH+'model-avazu-sgd.pkl'
 joblib.dump(cls, model_file)
+
 #serialize training
-preproc_file=MODEL_PATH+'model-avazu-preproc.pkl'
+preproc_file=MODEL_PATH+'model-avazu-preproc-sgd.pkl'
 joblib.dump(preproc, preproc_file)
