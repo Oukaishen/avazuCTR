@@ -38,10 +38,12 @@ import json
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+
 ##Read configuration parameters
 file_dir = './Avazu-settings.json'
 config = json.loads(open(file_dir).read())
-train_file=config["HOME"]+config["TRAIN_DATA_PATH"]+'random_subsample100m'
+# train_file=config["HOME"]+config["TRAIN_DATA_PATH"]+'random_subsample100m'
+train_file=config["HOME"]+config["TEST_DATA_PATH"]+'train'
 MODEL_PATH=config["HOME"]+config["MODEL_PATH"]
 warm_file=config["HOME"]+config["TRAIN_DATA_PATH"]+'random_subsampled50k'
 seed= int(config["SEED"])
@@ -53,7 +55,11 @@ seed= int(config["SEED"])
 chunk_size=int(config["CHUNK_SIZE"])
 header=['id','click','hour','C1','banner_pos','site_id','site_domain','site_category','app_id','app_domain','app_category','device_id'\
         ,'device_ip','device_model','device_type','device_conn_type','C14','C15','C16','C17','C18','C19','C20','C21']
-reader = pd.read_table(train_file, sep=',', chunksize=chunk_size, names=header,header=None)
+
+# reader = pd.read_table(train_file, sep=',', chunksize=chunk_size, names=header,header=None)
+reader = pd.read_table(train_file, sep=',', chunksize=chunk_size,header=0)
+warmer = pd.read_table(warm_file, sep=',', chunksize=chunk_size, names=header,header=None)
+
 #classes for partial fit
 all_classes = np.array([-1, 1])
 
@@ -61,7 +67,6 @@ all_classes = np.array([-1, 1])
 cls= SGDClassifier(loss='log', alpha=.0000001, penalty='l2', max_iter = 200,\
 learning_rate='invscaling',power_t=0.5,eta0=4.0,shuffle=True,n_jobs=-1,random_state=seed)
 
- 
 #preprocessing
 preproc =Pipeline([('fh',FeatureHasher( n_features=2**27,input_type='string', non_negative=False))])
 # 
@@ -82,7 +87,6 @@ def clean_data(data):
     data.loc[:,'pos']= data['banner_pos'].values.astype(str)+data['app_category'].values+data['site_category'].values 
     data.loc[:,'pS4']=data['C1'].values-data['C20'].values
     data.loc[:,'ps5']=data['C14'].values-data['C21'].values 
-    
     data.loc[:,'hour']=data['hour'].map(lambda x: datetime.strptime(str(x),"%y%m%d%H"))
     data.loc[:,'dayoftheweek']=data['hour'].map(lambda x:  x.weekday())
     data.loc[:,'day']=data['hour'].map(lambda x:  x.day)
@@ -94,26 +98,25 @@ def clean_data(data):
    ######## preprocessing
     
     X_train=preproc.fit_transform(X_dict)
-    
-    
     return day,y_train,X_train
+
+
 ###################################################################################
 # start warming
 start = datetime.now()
-warmer = pd.read_table(warm_file, sep=',', chunksize=chunk_size, names=header,header=None)
+
 for data in  warmer:
- day,y_train,X=clean_data(data )
- cls.partial_fit(X, y_train,classes = all_classes)
- y_pred=cls.predict_proba(X)
-#
+    day,y_train,X=clean_data(data )
+    cls.partial_fit(X, y_train,classes = all_classes)
+    y_pred=cls.predict_proba(X)
+
 ####estimate log_loss
- LogLoss=log_loss(y_train, y_pred)
- print('elapsed time: %s, log_loss:%f' % (str(datetime.now() - start), LogLoss))
+    LogLoss=log_loss(y_train, y_pred)
+    print('elapsed time: %s, log_loss:%f' % (str(datetime.now() - start), LogLoss))
 
 
 ###################################################################################
 # start training
-
 i=0
 temp=21
 for data in reader:
@@ -124,7 +127,6 @@ for data in reader:
     #
     ###estimate log_loss
     LogLoss=log_loss(y_train, y_pred)
-
     if i%10==0:
      print('iter:%s' %i)
      print(LogLoss)
@@ -141,12 +143,13 @@ print('latest iter:%s' %i)
 LogLoss1= cross_val_score(cls, X_train, y_train, scoring='log_loss')
 print(LogLoss1)
 print('elapsed time: %s, log_loss:%f' % (str(datetime.now() - start), LogLoss))
-
 ###################################################################################
+
 
 #serialize training
 model_file=MODEL_PATH+'model-avazu-sgd.pkl'
 joblib.dump(cls, model_file)
+
 
 #serialize training
 preproc_file=MODEL_PATH+'model-avazu-preproc-sgd.pkl'
